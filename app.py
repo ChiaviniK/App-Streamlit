@@ -34,17 +34,15 @@ st.markdown("""
 # ======================
 st.title("🎬 Streamflix — Dashboard de Filmes")
 st.caption("Análise exploratória do catálogo de filmes | Sprint 1")
-
 st.markdown("---")
 
 # ======================
-# SIDEBAR
+# SIDEBAR — DADOS
 # ======================
 st.sidebar.header("📁 Dados do Projeto")
 
 CSV_URL = "https://raw.githubusercontent.com/ChiaviniK/App-Streamlit/main/Movies.csv"
 
-# Download do arquivo
 response = requests.get(CSV_URL)
 csv_bytes = response.content
 
@@ -56,20 +54,36 @@ st.sidebar.download_button(
 )
 
 st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Carregamento de Dados")
 
-st.sidebar.header("⚙️ Configurações")
+# ======================
+# FUNÇÃO DE CARGA
+# ======================
+def load_data(file=None):
+    if file is not None:
+        return pd.read_csv(file)
+    return pd.read_csv(BytesIO(csv_bytes))
+
+# ======================
+# CONTROLE DE ESTADO
+# ======================
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
+
 uploaded_file = st.sidebar.file_uploader(
-    "Ou envie o arquivo movies.csv",
+    "Envie o arquivo movies.csv",
     type="csv"
 )
 
-# ======================
-# CARREGAMENTO DOS DADOS
-# ======================
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-else:
-    df = pd.read_csv(BytesIO(csv_bytes))
+if uploaded_file is not None:
+    st.session_state.df = load_data(uploaded_file)
+    st.sidebar.success("Arquivo carregado com sucesso!")
+
+if st.sidebar.button("🔄 Resetar para dados padrão"):
+    st.session_state.df = load_data()
+    st.sidebar.info("Dados padrão restaurados")
+
+df = st.session_state.df
 
 # ======================
 # VISÃO GERAL
@@ -90,10 +104,14 @@ with col1:
 with col2:
     if "Genre" in df.columns:
         st.metric("🎭 Gêneros Únicos", df["Genre"].nunique())
+    else:
+        st.metric("🎭 Gêneros Únicos", "N/A")
 
 with col3:
     if "Year" in df.columns:
         st.metric("📆 Anos Únicos", df["Year"].nunique())
+    else:
+        st.metric("📆 Anos Únicos", "N/A")
 
 # ======================
 # FILTROS
@@ -101,9 +119,9 @@ with col3:
 st.markdown("---")
 st.subheader("🔎 Filtros Interativos")
 
-colf1, colf2 = st.columns(2)
-
 filtered_df = df.copy()
+
+colf1, colf2 = st.columns(2)
 
 with colf1:
     if "Genre" in df.columns:
@@ -120,7 +138,10 @@ with colf2:
             "Intervalo de anos",
             int(df["Year"].min()),
             int(df["Year"].max()),
-            (int(df["Year"].min()), int(df["Year"].max()))
+            (
+                int(df["Year"].min()),
+                int(df["Year"].max())
+            )
         )
         filtered_df = filtered_df[
             (filtered_df["Year"] >= year_range[0]) &
@@ -140,12 +161,23 @@ with colg1:
     if "Genre" in filtered_df.columns:
         genre_count = filtered_df["Genre"].value_counts()
         st.bar_chart(genre_count)
+    else:
+        st.info("Coluna 'Genre' não encontrada.")
 
 with colg2:
     st.markdown("**📆 Filmes por Ano**")
     if "Year" in filtered_df.columns:
         year_count = filtered_df["Year"].value_counts().sort_index()
         st.line_chart(year_count)
+    else:
+        st.info("Coluna 'Year' não encontrada.")
+
+# ======================
+# TABELA FILTRADA
+# ======================
+st.markdown("---")
+st.subheader("📋 Dados Filtrados")
+st.dataframe(filtered_df, use_container_width=True)
 
 # ======================
 # FOOTER
